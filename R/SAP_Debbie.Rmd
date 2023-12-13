@@ -1,0 +1,126 @@
+```{r}
+data <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-noGit/data_sap/combined_forsap.csv", sep = "|")
+head(data, n = 10)
+```
+
+```{r}
+table_type <- (with(data,table(type)))
+print(table_type)
+```
+
+```{r}
+table_gender <- (with(data,table(type, gender)))
+print(table_gender)
+table_gender_sums <- addmargins(table_gender, FUN = "sum")
+print(table_gender_sums)
+```
+
+```{r}
+table_state <- (with(data,table(contact.address.state, type)))
+print(table_state)
+```
+
+```{r}
+library(dplyr)
+by_type <- data %>% 
+  group_by(contact.address.state, type) %>%
+  summarise(Count = n())
+#chisq.test(dog_data$gender, correct = F)
+print(by_type)
+
+```
+
+```{r}
+boxplot(Count ~ type, data = by_type, main = "Counts of Adoptable Dogs and Cats per US State/Territory", xlab = "Type", ylab = "Count of Adoptable Pets")
+```
+
+```{r}
+library(dplyr)
+by_gender_type <- data %>% 
+  group_by(contact.address.state, gender, type) %>%
+  filter(gender != 'Unknown') %>%
+  summarise(Count = n())
+#chisq.test(dog_data$gender, correct = F)
+print(by_gender_type)
+```
+```{r}
+boxplot(Count ~ gender + type, data = by_gender_type, main = "Counts of Adoptable Dogs and Cats per US State/Territory", xlab = "Type and Gender", ylab = "Count of Adoptable Pets")
+```
+```{r}
+library(tidyr)
+cities <- data %>% 
+  group_by(type, contact.address.city) %>%
+  filter(contact.address.city %in% c('Seattle', 'Spokane')) %>%
+  summarise(Count = n())
+
+#print(cities)
+
+df_wide <- cities %>% pivot_wider(names_from = contact.address.city, values_from = Count)
+
+print(df_wide)
+#print(df_wide[df_wide$type == 'Cat',])
+
+#chisq.test(cities$type, cities$contact.address.city)
+
+df_cats <- df_wide[df_wide$type == "Cat",]
+print(df_cats)
+df_adoptable_cats <- df_cats[,c("Seattle", "Spokane")]
+print(df_adoptable_cats)
+
+
+#filter(my_column %in% c("value1", "value2"))
+```
+```{r}
+by_type$bin <- ifelse(by_type$contact.address.state %in% c("WA", "OR", "ID"), "PNW", 
+                 ifelse(by_type$contact.address.state %in% c("CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"), "NE", 
+                        ifelse(by_type$contact.address.state %in% c("KY", "TN", "AL", "MS","AR", "LA", "OK", "TX"), "SC", NA)))
+
+print(by_type)
+print(names(by_type))
+
+by_region <- by_type %>% 
+  group_by(type, bin) %>%
+  filter(bin %in% c('PNW', 'Northeast', 'South Central')) %>%
+  summarize(Sum_Count = sum(Count))
+
+print(by_region)
+
+by_region_wide <- by_region %>% pivot_wider(names_from = bin, values_from = Sum_Count)
+print(by_region_wide)
+
+```
+```{r}
+boxplot(Count ~ bin + type, data = by_type, main = "Counts of Adoptable Dogs and Cats per Region", xlab = "Region", ylab = "Count of Adoptable Pets")
+```
+
+
+```{r}
+testing <- matrix(c(by_region_wide$Northeast, by_region_wide$PNW, by_region_wide$`South Central`), nrow=2, ncol=3)
+rownames(testing) <- c("cat", "dog")
+colnames(testing) <- c("Northeast", "PNW", "South Central")
+print(testing)
+test <- chisq.test(testing)
+print(test)
+```
+
+```{r}
+
+
+grooming <- data %>% 
+  group_by(energy_level_value) %>%
+  #filter(energy_level_value == "NA") %>%
+  summarise(Count = n())
+
+print(grooming)
+```
+
+```{r}
+library(dplyr)
+test <- data %>% 
+  group_by(status) %>%
+  #filter(energy_level_value == "NA") %>%
+  summarise(Count = n())
+
+print(test)
+```
+

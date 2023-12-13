@@ -1,0 +1,252 @@
+# Research Question 1
+
+### EDA\
+
+```{r}
+data <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/us_all_jantodec_adopted_dogsANDcats.csv")
+data <- data %>%
+  filter(contact.address.country == "US")
+head(data, 5)
+```
+```{r}
+print(unique(data$contact.address.state))
+unique_states_count <- data %>%
+  filter(type == "Dog") %>%
+  distinct(contact.address.state) %>%
+  nrow()
+
+print(unique_states_count)
+```
+
+
+
+```{r}
+data_pt3 <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/for_rq_1.csv")
+head(data_pt3, 5)
+```
+
+
+```{r}
+library(dplyr)
+eda_data <- data %>% 
+  group_by(contact.address.state, type) %>%
+  summarise(Adopted_Pets = n())
+
+head(eda_data, 5)
+
+```
+
+
+```{r}
+boxplot(Adopted_Pets ~ type, data = eda_data, main = "Counts of Adopted Dogs and Cats per US State", xlab = "Type", ylab = "Count of Adoptable Pets")
+```
+```{r}
+head(data_pt3, 5)
+```
+
+```{r}
+library(tidyr)
+data_new <- data_pt3 %>%
+  pivot_longer(cols = c(Avg_Count_Adopted_Dogs_per_Month, Avg_Count_Adopted_Cats_per_Month),
+               names_to = "type", values_to = "Adopted_Pets") %>%
+  mutate(type = tolower(type)) %>%
+  select(State, type, Adopted_Pets)
+
+
+data_new <- data_new %>%
+    mutate(type = ifelse(type == "avg_count_adopted_dogs_per_month",
+                       "Dog",
+                       ifelse(type == "avg_count_adopted_cats_per_month",
+                              "Cat",
+                              type)))
+
+head(data_new, 5)
+```
+```{r}
+boxplot(Adopted_Pets ~ type, data = data_new, main = "Avg. Counts of Adopted Dogs and Cats per US State/Month", xlab = "Type", ylab = "Avg. Count of Adopted Pets per Month")
+```
+**Create excel file that can be used by tableau for heat map**
+
+```{r}
+by_state <- data %>% 
+  group_by(contact.address.state, type) %>%
+  #filter(type == "Dog") %>%
+  summarise(Count = n())
+
+head(by_state, 5)
+print(unique(by_state$contact.address.state))
+```
+```{r}
+
+# Calculate the total count for each state and type
+totals <- by_state %>%
+  group_by(contact.address.state) %>%
+  summarise(total_count = sum(Count))
+
+head(totals, 5)
+
+# Join the totals back to the original data frame and calculate the proportion
+by_state_2 <- by_state %>%
+  left_join(totals, by = c("contact.address.state"))
+
+by_state_3 <- by_state_2 %>%
+  mutate(Prop = Count / total_count)
+
+# View the updated data frame
+head(by_state_3, 5)
+
+print(unique(by_state_3$contact.address.state))
+```
+
+```{r}
+write.csv(by_state_3, "data/props_for_heatmap_updated.csv")
+```
+
+```{r}
+print(by_state_3$contact.address.state)
+```
+
+
+### Part 1\
+
+```{r}
+#library(dplyr)
+by_type <- data %>% 
+  group_by(type) %>%
+  summarise(Count = n())
+
+by_type <- by_type %>%
+  mutate(Prop = Count / sum(Count))
+
+print(by_type)
+```
+```{r}
+
+cat_df <- by_type %>%
+          filter(type == "Cat")
+
+dog_df <- by_type %>%
+          filter(type == "Dog")
+
+data <- data.frame(
+  Cat = cat_df$Count[1],
+  Dog = dog_df$Count[1]
+)
+
+# Create the box plot
+barplot(as.matrix(data), main = "Cats and Dogs from Sample", ylab = "Count")
+```
+
+
+
+```{r}
+test_result <- prop.test(x = by_type$Count[2], n = sum(by_type$Count), p = 0.5, correct = FALSE)
+print(test_result)
+
+cat("z test statistic:", sqrt(test_result$statistic), "\n")
+cat("p-value:", test_result$p.value, "\n")
+```
+
+### Part 2\
+
+```{r}
+#library(dplyr)
+
+data <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/us_all_jantodec_adopted_dogsANDcats.csv")
+data <- data %>%
+  filter(contact.address.country == "US")
+head(data, 5)
+
+by_region <- data %>% 
+  group_by(contact.address.state, type) %>%
+  summarise(Count = n())
+
+print(by_region)
+
+by_region$region <- ifelse(by_region$contact.address.state %in% c("WA", "OR", "ID"), "PNW", 
+                 ifelse(by_region$contact.address.state %in% c("CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"), "NE", 
+                        ifelse(by_region$contact.address.state %in% c("KY", "TN", "AL", "MS","AR", "LA", "OK", "TX"), "SC", NA)))
+
+head(by_region, 5)
+print(names(by_region))
+
+by_region <- by_region %>% 
+  group_by(type, region) %>%
+  filter(region %in% c('PNW', 'NE', 'SC')) %>%
+  summarize(Adopted_Count = sum(Count))
+
+head(by_region, 5)
+```
+```{r}
+# Create a table of counts for dogs and cats in each region
+table <- xtabs(Adopted_Count ~ type + region, data = by_region)
+
+# Calculate the proportions of dogs in each region
+prop_dog_PNW <- table["Dog", "PNW"] / sum(table[, "PNW"])
+prop_dog_SC <- table["Dog", "SC"] / sum(table[, "SC" ])
+
+print(table)
+print(prop_dog_PNW)
+print(prop_dog_SC)
+
+```
+
+
+```{r}
+# Perform a two-sample z-test for comparing two proportions
+results <- prop.test(x = c(table["Dog", "PNW"], table["Dog", "SC"]), 
+          n = c(sum(table[, "PNW"]), sum(table[, "SC"])),
+          correct = FALSE)
+print(results)
+cat("z test statistic:", sqrt(results$statistic), "\n")
+cat("p-value:", results$p.value, "\n")
+```
+**Double check z-stat**
+
+```{r}
+numerator = (prop_dog_PNW - prop_dog_SC)
+
+n_pnw = sum(table[,"PNW"])
+n_sc = sum(table[,"SC"])
+
+pooled_p = (table["Dog", "PNW"] + table["Dog", "SC"]) / (n_pnw + n_sc)
+
+denom_1 = (1 / n_pnw) + (1 / n_sc)
+
+denominator = sqrt(pooled_p * (1 - pooled_p) * denom_1)
+
+z_stat = abs(numerator / denominator)
+
+print(z_stat)
+```
+
+
+### Part 3\
+```{r}
+data_before_gp <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/for_rq_1_before_grouping.csv")
+head(data_before_gp, 5)
+```
+
+
+```{r}
+tx <- data_before_gp %>% 
+  filter(contact.address.state %in% c('TX'))
+
+wa <- data_before_gp %>% 
+  filter(contact.address.state %in% c('WA'))
+
+print(tx)
+print(wa)
+```
+
+```{r}
+# Conduct the two-sample t-test
+results_t_test <- t.test(
+  x = tx$Count.of.Adopted.Dogs, 
+  y = wa$Count.of.Adopted.Dogs,
+  var.equal = FALSE
+)
+
+print(results_t_test)
+```
+
