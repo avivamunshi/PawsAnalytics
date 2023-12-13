@@ -1,0 +1,61 @@
+---
+title: "AdoptablePetAnalysis"
+author: "Aviva Munshi"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r}
+# Read in your data
+library(readr)
+data <- read_csv("/Users/aviva/rq2data")
+# Welch Two sample t-test on days in the shelter by type of animal
+t.test(data$days_in_shelter ~ data$type)
+```
+
+```{r}
+# ANOVA Test to compare the mean days spent on Petfinder before adoption between male and female dogs
+model <- aov(days_in_shelter ~ gender, data = data[data$species == "Dog",])
+summary(model)
+```
+
+```{r}
+#  ANOVA Test to compare the mean days spent on Petfinder before adoption between small and large dogs
+model <- aov(days_in_shelter ~ size, data = data[data$species == "Dog",])
+summary(model)
+```
+
+```{r}
+# Survival Analysis and Regression
+# Load required packages
+library(survival)
+library(dplyr)
+
+# Create a survival object
+surv_obj <- with(data, Surv(days_in_shelter, rep(1, length(days_in_shelter)), type = "right"))
+
+# Fit a Cox proportional hazards model
+cox_model <- coxph(surv_obj ~ age + size + 
+                   attributes.spayed_neutered + attributes.house_trained + attributes.special_needs + attributes.shots_current + environment.dogs, data = data)
+
+# Print the summary of the model
+summary(cox_model)
+```
+
+```{r}
+# Load required packages
+#install.packages("glmnet")
+library(dplyr)
+library(tidyr)
+library(glmnet)
+
+# Define outcome variable
+data$adopted <- ifelse(data$days_in_shelter == 0, 1, 0)
+
+# Fit regression model
+model <- glm(adopted ~ age + size + colors.primary + 
+                   attributes.spayed_neutered + attributes.house_trained + attributes.special_needs + attributes.shots_current + environment.dogs, data = data, family = "binomial")
+
+# Print summary of model
+summary(model)
+```

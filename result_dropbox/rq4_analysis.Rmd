@@ -1,0 +1,207 @@
+---
+title: "Research Analysis"
+author: "Guo-Yi Jenny Wong"
+date: "2023-02-28"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Read Data
+
+```{r}
+states <- read.csv("census/states.csv")
+income <- read.csv("census/income.csv")
+income <- income %>% inner_join(states, by=c("state"))
+population <- read.csv("census/population.csv")
+
+petfinder_3region <- read.csv("jantodec_3regs_adopted_dogsANDcats.csv")
+petfinder_3region <- petfinder_3region %>% 
+  filter(contact.address.country=="US")  %>% 
+  mutate(region=ifelse(contact.address.state %in% c("WA", "OR", "ID"), "PNW",
+                       ifelse(contact.address.state %in% c("CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"), "NE",
+                              ifelse(contact.address.state %in% c("KY", "TN", "AL", "MS","AR", "LA", "OK", "TX"), "SC", NA)))) %>% 
+  filter(!is.na(region))
+
+pet3_feature <- select(petfinder_3region, 
+                       c("region", "contact.address.state", "species", "age", 
+                         "gender", "size", "breed", "coat"))
+head(pet3_feature)
+```
+
+
+## Evaluate Pet
+
+```{r}
+pet3_state_count <- 
+  petfinder_3region %>% 
+  group_by(contact.address.state, species) %>% 
+  summarise(pet_count=n_distinct(id), .groups = 'drop') %>% 
+  arrange(desc(pet_count))
+
+head(pet3_state_count)
+```
+
+
+
+## Evaluate Income
+```{r}
+ggplot(income, aes(x=household_type, y=median_income)) +
+  geom_boxplot() +
+  ggtitle('Median Income by Household Type') +
+       theme(panel.background = element_rect(fill='transparent'),
+             plot.title = element_text(hjust = 0.5),
+             axis.text=element_text(size=10.5))
+```
+
+```{r income data manipulation}
+income_recalculated <-
+  income %>% 
+  group_by(state) %>% 
+  mutate(pct = total / sum(total)) %>% 
+  mutate(weighted_income = median_income * pct) %>% 
+  ungroup() %>% 
+  group_by(state, state_abbrev) %>% 
+  summarise(new_median_income=sum(weighted_income), .groups = 'drop')
+
+head(income_recalculated)
+```
+
+```{r merge income data w/ count}
+pet3_count_income <-
+  pet3_state_count %>% 
+  inner_join(income_recalculated, by=c("contact.address.state"="state_abbrev"))
+
+pet3_fit1_data <- pet3_feature %>% inner_join(pet3_count_income, by=c("contact.address.state", "species"))
+head(pet3_fit1_data)
+```
+
+```{r fit w/ income}
+fit1 <- lm(pet_count ~ I(region)+I(species)+I(age)+I(gender)+I(size)+I(coat)+new_median_income, data=pet3_fit1_data)
+summary(fit1)
+```
+
+## Evaluate Population
+
+```{r}
+plot(population$total_population, population$median_age, main="Total Population vs. Median Age",
+     xlab = "Total Population", ylab = "Median Age")
+```
+
+```{r}
+pet3_count_income_pop <-
+  pet3_count_income %>% 
+  inner_join(population, by=c("state"))
+
+pet3_fit2_data <- pet3_feature %>% inner_join(pet3_count_income_pop, by=c("contact.address.state", "species"))
+
+head(pet3_fit2_data)
+```
+```{r fit w/ income+pop}
+fit2 <- lm(pet_count ~ I(region)+I(species)+I(age)+I(gender)+I(size)+I(coat)+new_median_income+total_population+median_age, data=pet3_fit2_data)
+summary(fit2)
+```
+
+
+
+```{r chisq test}
+head(pet3_fit2_data)
+
+# region vs pet age
+# H_0: region and age are independent; H_a: region and age are related
+tab1 <- table(data.frame(pet3_fit2_data$region, pet3_fit2_data$age))
+tab1
+chisq.test(tab1)
+  
+# region vs pet gender
+# H_0: region and gender are independent; H_a: region and gender are related
+tab2 <- table(data.frame(pet3_fit2_data$region, pet3_fit2_data$gender))
+tab2
+chisq.test(tab2)
+
+# region vs pet size
+# H_0: region and size are independent; H_a: region and size are related
+tab3 <- table(data.frame(pet3_fit2_data$region, pet3_fit2_data$size))
+tab3
+chisq.test(tab3)
+
+
+# region vs pet species
+# H_0: region and species are independent; H_a: region and species are related
+tab4 <- table(data.frame(pet3_fit2_data$region, pet3_fit2_data$species))
+tab4
+chisq.test(tab4)
+
+# region vs pet coat
+# H_0: region and coat are independent; H_a: region and coat are related
+tab5 <- table(data.frame(pet3_fit2_data$region, pet3_fit2_data$coat))
+tab5
+chisq.test(tab5)
+```
+## Fit Model
+```{r}
+fit3 <- lm(pet_count ~ I(region)+I(gender)+new_median_income+total_population+median_age, data=pet3_fit2_data)
+summary(fit3)
+
+# Residuals vs fitted values
+plot(fit3$fitted.values, fit3$residuals, main="Residuals vs Fitted values")
+abline(h=0, col='grey')
+
+# Residuals vs predictor
+plot(pet3_fit2_data$new_median_income, fit3$residuals, main="Residuals vs Predictor")
+abline(h=0, col='grey')
+
+plot(pet3_fit2_data$total_population, fit3$residuals, main="Residuals vs Predictor")
+abline(h=0, col='grey')
+
+plot(pet3_fit2_data$median_age, fit3$residuals, main="Residuals vs Predictor")
+abline(h=0, col='grey')
+
+# QQ plot
+qqnorm(fit3$residuals, frame=FALSE)
+qqline(fit3$residuals)
+
+hist(fit3$residuals)
+```
+
+```{r}
+pet3_fit2_data_t = pet3_fit2_data %>% filter(state != "Texas")
+
+fit3 <- lm(pet_count ~ I(region)+I(gender)+new_median_income+total_population+median_age, data=pet3_fit2_data_t)
+summary(fit3)
+
+# Residuals vs fitted values
+plot(fit3$fitted.values, fit3$residuals, main="Residuals vs Fitted values")
+abline(h=0, col='grey')
+
+# Residuals vs predictor
+plot(pet3_fit2_data_t$new_median_income, fit3$residuals, main="Residuals vs Predictor")
+abline(h=0, col='grey')
+
+plot(pet3_fit2_data_t$total_population, fit3$residuals, main="Residuals vs Predictor")
+abline(h=0, col='grey')
+
+plot(pet3_fit2_data_t$median_age, fit3$residuals, main="Residuals vs Predictor")
+abline(h=0, col='grey')
+
+# QQ plot
+qqnorm(fit3$residuals, frame=FALSE)
+qqline(fit3$residuals)
+
+hist(fit3$residuals)
+```
+
+
+```{r}
+library(sandwich)
+library(lmtest)
+
+robust_se=coeftest(fit3, vcov = vcovHC)
+robust_se
+```
+

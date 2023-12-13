@@ -1,0 +1,87 @@
+data <- read.csv(file = "/Users/harshitamaddi/Desktop/UW/DATA557AppliedStats/Project_Adoptable_Pets/dogs_18_joined_akc_pf.csv", header = TRUE, sep = "|")
+
+head(data, 5)
+
+#Plotting histograms of life expectancies
+hist(data$min_expectancy, main = "Histogram of min Life Expectancies of adopted Dogs on PetFinder", xlab = "Min expectancy(years)")
+
+hist(data$max_expectancy, main = "Histogram of max Life Expectancies of adopted Dogs on PetFinder", xlab = "Max expectancy(years)")
+
+# Create a vector of minimum expectancies
+min_expectancy <- data$min_expectancy
+
+# Create a normal probability plot
+qqnorm(min_expectancy)
+qqline(min_expectancy)
+
+# Z test for min_expectancy 
+# Set significance level (alpha)
+alpha <- 0.05
+
+# Calculate sample mean and standard deviation
+x_bar_min <- mean(data$min_expectancy, na.rm = TRUE)
+s_min <- sd(data$min_expectancy, na.rm = TRUE)
+
+# Set null hypothesis value
+mu_0 <- 10
+
+# Calculate test statistic
+z_min <- (x_bar_min - mu_0) / (s_min / sqrt(length(na.omit(data$min_expectancy))))
+
+# Calculate p-value (two-tailed)
+p_value_min <- 2 * pnorm(-abs(z_min))
+
+# Compare p-value to alpha
+if(p_value_min < alpha) {
+  cat("Reject null hypothesis. Sample mean is significantly different from", mu_0, "\n")
+} else {
+  cat("Fail to reject null hypothesis. Sample mean is not significantly different from", mu_0, "\n")
+}
+
+# Display test results
+cat("Test statistic:", z_min, "\n")
+cat("P-value:", p_value_min, "\n")
+
+
+# Z test for max_expectancy 
+# Set significance level (alpha)
+alpha <- 0.05
+
+# Calculate sample mean and standard deviation
+x_bar_max <- mean(data$max_expectancy, na.rm = TRUE)
+s_max <- sd(data$max_expectancy, na.rm = TRUE)
+
+# Set null hypothesis value
+mu_0 <- 10
+
+# Calculate test statistic
+z_max <- (x_bar_max - mu_0) / (s_max / sqrt(length(na.omit(data$max_expectancy))))
+
+# Calculate p-value (two-tailed)
+p_value_max <- 2 * pnorm(-abs(z_max))
+
+# Compare p-value to alpha
+if(p_value_max < alpha) {
+  cat("Reject null hypothesis. Sample mean is significantly different from", mu_0, "\n")
+} else {
+  cat("Fail to reject null hypothesis. Sample mean is not significantly different from", mu_0, "\n")
+}
+
+# Display test results
+cat("Test statistic:", z_max, "\n")
+cat("P-value:", p_value_max, "\n")
+
+
+
+#ANOVA test for difference in min_expectancy for difference regions 
+#Data used has a region column with values PNW SS NE
+data <- read.csv(file = "/Users/harshitamaddi/Desktop/UW/DATA557AppliedStats/Project_Adoptable_Pets/region_dogs_18_joined_akc_pf.csv", header = TRUE, sep = "|")
+
+#data$category <- as.factor(data$region)
+
+# Perform ANOVA
+my_model <- aov(data$min_expectancy ~ data$region)
+summary(my_model)
+
+
+summary(my_model)[[1]][["Pr(>F)"]][1]

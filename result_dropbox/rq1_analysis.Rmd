@@ -1,0 +1,312 @@
+# Adopted Pet Analysis - Research Question 1
+
+### EDA Part 1 - Z-Tests for Proportion\
+
+#### Read in the file for us_all_jantodec_adopted_dogsANDcats file
+```{r}
+library(dplyr)
+data <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/us_all_jantodec_adopted_dogsANDcats.csv")
+data <- data %>%
+  filter(contact.address.country == "US")
+head(data, 5)
+```
+#### Determine the states include in the dataset
+
+```{r}
+print(unique(data$contact.address.state))
+unique_states_count <- data %>%
+  filter(type == "Dog") %>%
+  distinct(contact.address.state) %>%
+  nrow()
+
+print(unique_states_count)
+```
+
+#### Determine the time range of the dataset
+
+```{r}
+oldest_published <- min(data$published_at)
+most_recent_published <- max(data$published_at)
+
+oldest_status_changed <- min(data$status_changed_at)
+most_recent_status_changed <- max(data$status_changed_at)
+
+
+print(paste0("published_at date range: ", oldest_published, " to ", most_recent_published))
+print(paste0("status_changed_at date range: ", oldest_status_changed, " to ", most_recent_status_changed))
+
+```
+
+#### Determine the statuses in the dataset
+```{r}
+status <- data %>% 
+  group_by(status, type) %>%
+  summarise(Adopted_Pets = n())
+
+head(status, 5)
+```
+#### Determine the breeds in the dataset
+
+```{r}
+unique_dog_breeds_count <- data %>%
+  filter(type == "Dog") %>%
+  distinct(breed) %>%
+  nrow()
+
+dog_breeds <- data %>% 
+  group_by(breed) %>%
+  filter(type == 'Dog') %>%
+  summarise(Adopted_Pets = n())
+
+print(head(dog_breeds, 5))
+print(paste0("Unique dog breeds count: ",unique_dog_breeds_count))
+
+
+```
+
+
+#### Group by Animal Type
+```{r}
+sample_size <- data %>% 
+  group_by(type) %>%
+  summarise(Adopted_Pets = n())
+
+head(sample_size, 5)
+```
+#### Group by Animal Type, By State
+```{r}
+eda_data <- data %>% 
+  group_by(contact.address.state, type) %>%
+  summarise(Adopted_Pets = n())
+
+head(eda_data, 5)
+```
+
+```{r}
+boxplot(Adopted_Pets ~ type, data = eda_data, main = "Range of Counts of Adopted Dogs and Cats per US State", xlab = "Type", ylab = "Count of Adopted Pets")
+```
+
+#### Get the proportion of dogs and cats for each state
+```{r}
+# Calculate the total count for each state and type
+totals <- eda_data %>%
+  group_by(contact.address.state) %>%
+  summarise(total_count = sum(Adopted_Pets))
+
+head(totals, 5)
+
+# Join the totals back to the original data frame and calculate the proportion
+by_state <- eda_data %>%
+  left_join(totals, by = c("contact.address.state"))
+
+by_state <- by_state %>%
+  mutate(Prop = Adopted_Pets / total_count)
+
+head(by_state, 5)
+
+```
+
+#### Export the dataframe to a csv (for upload to Tableau for heatmap creation)
+```{r}
+write.csv(by_state, "props_for_heatmap_updated.csv")
+```
+
+#### Create bins for PNW, SC, and NE regions
+
+```{r}
+by_region <- by_state
+
+by_region$region <- ifelse(by_region$contact.address.state %in% c("WA", "OR", "ID"), "PNW", 
+                 ifelse(by_region$contact.address.state %in% c("CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"), "NE", 
+                        ifelse(by_region$contact.address.state %in% c("KY", "TN", "AL", "MS","AR", "LA", "OK", "TX"), "SC", NA)))
+
+by_region <- by_region %>%
+  filter(region %in% c('PNW', 'NE', 'SC'))
+
+head(by_region, 5)
+```
+
+```{r}
+boxplot(Prop ~ region + type, data = by_region, main = "Range of Proportions of Adopted Dogs and Cats per US State by Region", xlab = "Region, Type", ylab = "Proportion of Adopted Pets")
+```
+
+
+
+### Statistical Tests - Part 1
+
+#### One Sample Z-Test for a Proportion
+
+```{r}
+by_type <- data %>% 
+  group_by(type) %>%
+  summarise(Count = n())
+
+by_type <- by_type %>%
+  mutate(Prop = Count / sum(Count))
+
+print(by_type)
+```
+
+```{r}
+test_result <- prop.test(x = by_type$Count[2], n = sum(by_type$Count), p = 0.5, correct = FALSE)
+print(test_result)
+
+cat("z test statistic:", sqrt(test_result$statistic), "\n")
+cat("p-value:", test_result$p.value, "\n")
+```
+
+#### Two Sample Z-Test for Comparing Two Proportions
+
+```{r}
+by_region <- data %>% 
+  group_by(contact.address.state, type) %>%
+  summarise(Count = n())
+
+by_region$region <- ifelse(by_region$contact.address.state %in% c("WA", "OR", "ID"), "PNW", 
+                 ifelse(by_region$contact.address.state %in% c("CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"), "NE", 
+                        ifelse(by_region$contact.address.state %in% c("KY", "TN", "AL", "MS","AR", "LA", "OK", "TX"), "SC", NA)))
+
+by_region <- by_region %>% 
+  group_by(type, region) %>%
+  filter(region %in% c('PNW', 'NE', 'SC')) %>%
+  summarize(Adopted_Count = sum(Count))
+
+head(by_region, 5)
+```
+
+```{r}
+# Create a table of counts for dogs and cats in each region
+table <- xtabs(Adopted_Count ~ type + region, data = by_region)
+
+# Calculate the proportions of dogs in each region
+prop_dog_PNW <- table["Dog", "PNW"] / sum(table[, "PNW"])
+prop_dog_SC <- table["Dog", "SC"] / sum(table[, "SC" ])
+
+print(table)
+cat("\nProportion of dogs in PNW: ", prop_dog_PNW, "\n")
+cat("Proportion of dogs in SC: ", prop_dog_SC)
+```
+
+
+
+```{r}
+# Perform a two-sample z-test for comparing two proportions
+results <- prop.test(x = c(table["Dog", "PNW"], table["Dog", "SC"]), 
+          n = c(sum(table[, "PNW"]), sum(table[, "SC"])),
+          correct = FALSE)
+print(results)
+cat("z test statistic:", sqrt(results$statistic), "\n")
+cat("p-value:", results$p.value, "\n")
+```
+### EDA Part 2 - Welch Two-Sample Test with t-distribution\
+
+#### Read in the file for adopted_pets_per_month file
+
+```{r}
+data_2 <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/adopted_pets_per_month.csv")
+data_2 <- data_2 %>%
+  filter(!(month_year %in% c("2023-03", "2023-02", "2023-01")))
+
+
+print(head(data_2, 10))
+```
+#### Determine the states included in the dataset
+
+```{r}
+print(unique(data_2$contact.address.state))
+unique_states_count <- data_2 %>%
+  distinct(contact.address.state) %>%
+  nrow()
+
+print(unique_states_count)
+```
+
+#### Determine the time range of the dataset
+
+```{r}
+oldest <- min(data_2$month_year)
+most_recent <- max(data_2$month_year)
+
+unique_months_count <- data_2 %>%
+  distinct(month_year) %>%
+  nrow()
+
+print(paste0("published_at date range: ", oldest, " to ", most_recent))
+print(paste0("number of unique months: ", unique_months_count))
+
+```
+
+#### Determine if 24 months is a large enough sample size
+```{r}
+tx <- data_2 %>%
+  filter(contact.address.state == "TX")
+wa <- data_2 %>%
+  filter(contact.address.state == "WA")
+sd_tx = sd(tx$Count.of.Adopted.Cats)
+sd_wa = sd(wa$Count.of.Adopted.Dogs)
+
+sd_pooled = sqrt(((sd_tx)^2 + (sd_wa) ^2) /2)
+print(paste0("sd_pooled: ",sd_pooled))
+
+diff_in_means = 96
+d = diff_in_means / sd_pooled
+print(paste0("difference in means to calc. effect size: ", diff_in_means))
+print(paste0("d for use in pwr.t.test: ", d))
+```
+
+```{r}
+library(pwr)
+pwr.t.test(n = NULL, 
+           d = d , 
+           sig.level = 0.05, 
+           power = 0.75, 
+           type = "two.sample", 
+           alternative = "two.sided")
+```
+
+#### Create boxplot
+
+```{r}
+library(tidyr)
+data_2_renamed <- data_2 %>%
+  rename(Cat = Count.of.Adopted.Cats, Dog = Count.of.Adopted.Dogs)
+
+df_long <- pivot_longer(data_2_renamed, cols = c("Cat", "Dog"), 
+                        names_to = "Type", values_to = "Count_of_Adopted_Pets")
+print(head(df_long, 10))
+```
+
+```{r}
+boxplot(Count_of_Adopted_Pets ~ Type + contact.address.state, data = df_long, main = "Range of Counts of Adopted Pets per Month by State", xlab = "Type, State", ylab = "Count of Adopted Pets")
+```
+
+
+### Statistical Tests - Part 2
+
+#### Welch Two Sample t-test
+
+
+```{r}
+tx <- data_2 %>% 
+  filter(contact.address.state %in% c('TX'))
+
+wa <- data_2 %>% 
+  filter(contact.address.state %in% c('WA'))
+
+print(tx)
+print(wa)
+```
+
+
+
+```{r}
+# Conduct the two-sample t-test
+results_t_test <- t.test(
+  x = tx$Count.of.Adopted.Dogs, 
+  y = wa$Count.of.Adopted.Dogs,
+  var.equal = FALSE
+)
+
+print(results_t_test)
+```
+
