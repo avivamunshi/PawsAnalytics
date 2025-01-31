@@ -21,7 +21,7 @@ print(unique_states_count)
 
 
 ```{r}
-data_pt3 <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/for_rq_1.csv")
+data_pt3 <- read.csv(file = "/Users/avivam/uw-code/BIOST557/Project-R/data/for_rq_1.csv")
 head(data_pt3, 5)
 ```
 
