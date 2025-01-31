@@ -152,7 +152,7 @@ cat("p-value:", test_result$p.value, "\n")
 ```{r}
 #library(dplyr)
 
-data <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/us_all_jantodec_adopted_dogsANDcats.csv")
+data <- read.csv(file = "/Users/avivam/uw-code/BIOST557/Project-R/data/us_all_jantodec_adopted_dogsANDcats.csv")
 data <- data %>%
   filter(contact.address.country == "US")
 head(data, 5)
@@ -223,7 +223,7 @@ print(z_stat)
 
 ### Part 3\
 ```{r}
-data_before_gp <- read.csv(file = "/Users/debbiesubocz/uw-code/BIOST557/Project-R/data/for_rq_1_before_grouping.csv")
+data_before_gp <- read.csv(file = "/Users/avivam/uw-code/BIOST557/Project-R/data/for_rq_1_before_grouping.csv")
 head(data_before_gp, 5)
 ```
 
